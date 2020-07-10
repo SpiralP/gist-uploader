@@ -1,0 +1,13 @@
+[package]
+name = "gist-uploader"
+version = "0.1.0"
+authors = ["SpiralP <spiral.palmer@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+clap = "2.33.1"
+error-chain = "0.12.2"
+futures = "0.3.5"
+reqwest = { version = "0.10.6", features = ["json"] }
+serde = { version = "1.0.114", features = ["derive"] }
+tokio = { version = "0.2.21", features = ["full"] }
