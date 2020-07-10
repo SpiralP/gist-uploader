@@ -1,5 +1,6 @@
-pub use error_chain::bail;
+use crate::github_gists::GitHubError;
 use error_chain::error_chain;
+pub use error_chain::{bail, ensure};
 
 error_chain! {
     foreign_links {
@@ -10,5 +11,15 @@ error_chain! {
         ParseBoolError(::std::str::ParseBoolError);
         Tokio(tokio::task::JoinError);
         Clap(clap::Error);
+        Reqwest(reqwest::Error);
+        ReqwestHeader(reqwest::header::InvalidHeaderValue);
+        SerdeJson(serde_json::Error);
+    }
+
+    errors {
+        GitHub(error: GitHubError) {
+            description("GitHub api error")
+            display("GitHub api error: {}", error.message)
+        }
     }
 }
