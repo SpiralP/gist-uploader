@@ -1,13 +1,17 @@
 mod error;
+mod gists_api;
 mod git;
-mod github_gists;
 mod logger;
 
 use crate::{error::*, git::handle_heavy_paths};
 use clap::{crate_name, crate_version, App, Arg};
 use futures::StreamExt;
 use log::*;
-use std::{collections::HashMap, path::Path, pin::Pin};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    pin::Pin,
+};
 use tokio::{
     fs::File,
     io::{stdin, AsyncReadExt, BufReader},
@@ -47,13 +51,13 @@ async fn main() -> Result<()> {
     let mut successes = results.drain(..).collect::<Result<Vec<_>>>()?;
 
     let mut light_contents: Vec<(&Path, String)> = Vec::new();
-    let mut heavy_paths: Vec<&Path> = Vec::new();
+    let mut heavy_paths: Vec<PathBuf> = Vec::new();
 
     for (path, light_content) in successes.drain(..) {
         if let Some(light_content) = light_content {
             light_contents.push((path, light_content));
         } else {
-            heavy_paths.push(path);
+            heavy_paths.push(path.to_path_buf());
         }
     }
 
@@ -78,15 +82,15 @@ async fn main() -> Result<()> {
 
     info!(
         "creating gist with {} light files and {} heavy files",
-        files.len(),
+        if need_temp_file { 0 } else { files.len() },
         heavy_paths.len()
     );
 
-    let gist_id = github_gists::create(files, false, None).await?;
+    let gist_id = gists_api::create(files, false, None).await?;
     debug!("gist {} created", gist_id);
 
     if !heavy_paths.is_empty() {
-        handle_heavy_paths(&heavy_paths, &gist_id, need_temp_file).await?;
+        handle_heavy_paths(heavy_paths, gist_id.clone(), need_temp_file).await?;
     }
 
     info!("gist https://gist.github.com/{} created", gist_id);
@@ -104,7 +108,7 @@ async fn get_light_content(path: &Path) -> Result<Option<String>> {
 
         Box::pin(BufReader::new(f))
     } else {
-        // windows ctrl-z and enter, linux ctrl-d
+        // windows ctrl-z, linux ctrl-d
         info!("reading text from stdin");
         Box::pin(BufReader::new(stdin()))
     };

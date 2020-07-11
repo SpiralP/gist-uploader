@@ -1,4 +1,4 @@
-use crate::github_gists::GitHubError;
+use crate::gists_api::GitHubError;
 use error_chain::error_chain;
 pub use error_chain::{bail, ensure};
 
