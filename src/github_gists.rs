@@ -1,5 +1,6 @@
 use crate::error::*;
 use dirs::home_dir;
+use log::*;
 use reqwest::{header, header::HeaderValue, Client};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, env, fs::File, io::prelude::*};
@@ -58,6 +59,7 @@ pub async fn create(
     // content must not be blank
     // must have at least 1 file
 
+    info!("creating gist");
     let response = make_client()?
         .post("https://api.github.com/gists")
         .json(&PostGistsRequest {
@@ -137,7 +139,17 @@ pub struct GitHubError {
 #[tokio::test]
 async fn test_create_empty() {
     let mut files = HashMap::new();
-    files.insert("file.txt".to_string(), "content".to_string());
+
+    let mut content = String::new();
+    {
+        let mut f = File::open(r"C:\Users\SpiralP\Desktop\cc\cat.png").unwrap();
+        if let Err(e) = f.read_to_string(&mut content) {
+            // let ag: () = e;
+            panic!("{}", e);
+        }
+    }
+
+    files.insert("file.txt".to_string(), content);
     let id = create(files, false, None).await.unwrap();
     println!("{:#?}", id);
     delete(&id).await.unwrap();

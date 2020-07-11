@@ -14,6 +14,7 @@ error_chain! {
         Reqwest(reqwest::Error);
         ReqwestHeader(reqwest::header::InvalidHeaderValue);
         SerdeJson(serde_json::Error);
+        Git2(git2::Error);
     }
 
     errors {
