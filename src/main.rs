@@ -7,10 +7,11 @@ use crate::{error::*, git::handle_heavy_paths};
 use clap::{crate_name, crate_version, App, Arg};
 use futures::StreamExt;
 use log::*;
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap, path::Path, pin::Pin};
 use tokio::{
     fs::File,
     io::{stdin, AsyncReadExt, BufReader},
+    prelude::AsyncRead,
 };
 
 #[tokio::main]
@@ -84,7 +85,9 @@ async fn main() -> Result<()> {
     let gist_id = github_gists::create(files, false, None).await?;
     debug!("gist {} created", gist_id);
 
-    handle_heavy_paths(&heavy_paths, &gist_id, need_temp_file).await?;
+    if !heavy_paths.is_empty() {
+        handle_heavy_paths(&heavy_paths, &gist_id, need_temp_file).await?;
+    }
 
     info!("gist https://gist.github.com/{} created", gist_id);
 
@@ -92,38 +95,31 @@ async fn main() -> Result<()> {
 }
 
 async fn get_light_content(path: &Path) -> Result<Option<String>> {
-    if path.to_str().unwrap() != "-" {
+    let mut reader: Pin<Box<dyn AsyncRead>> = if path.to_str().unwrap() != "-" {
         let f = File::open(path).await?;
         if f.metadata().await?.len() > 10 * 1024 * 1024 {
             // Be aware that for files larger than ten megabytes, you'll need to clone the gist
-            Ok(None)
-        } else {
-            let mut content = String::new();
-            let mut reader = BufReader::new(f);
-            if let Err(e) = reader.read_to_string(&mut content).await {
-                if e.kind() == std::io::ErrorKind::InvalidData {
-                    Ok(None)
-                } else {
-                    Err(e.into())
-                }
-            } else {
-                Ok(Some(content))
-            }
+            return Ok(None);
         }
+
+        Box::pin(BufReader::new(f))
     } else {
-        let mut f = stdin();
-        let mut content = String::new();
-        if let Err(e) = f.read_to_string(&mut content).await {
-            if e.kind() == std::io::ErrorKind::InvalidData {
-                Ok(None)
-            } else {
-                Err(e.into())
-            }
-        } else if content.len() > 10 * 1024 * 1024 {
-            // Be aware that for files larger than ten megabytes, you'll need to clone the gist
+        // windows ctrl-z and enter, linux ctrl-d
+        info!("reading text from stdin");
+        Box::pin(BufReader::new(stdin()))
+    };
+
+    let mut content = String::new();
+    if let Err(e) = reader.read_to_string(&mut content).await {
+        if e.kind() == std::io::ErrorKind::InvalidData {
             Ok(None)
         } else {
-            Ok(Some(content))
+            Err(e.into())
         }
+    } else if content.len() > 10 * 1024 * 1024 {
+        // Be aware that for files larger than ten megabytes, you'll need to clone the gist
+        Ok(None)
+    } else {
+        Ok(Some(content))
     }
 }
