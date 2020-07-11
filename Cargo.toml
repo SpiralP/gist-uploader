@@ -4,6 +4,10 @@ version = "0.1.0"
 authors = ["SpiralP <spiral.palmer@gmail.com>"]
 edition = "2018"
 
+[[bin]]
+name = "gist"
+path = "src/main.rs"
+
 [dependencies]
 clap = "2.33.1"
 dirs = "3.0.1"

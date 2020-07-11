@@ -1,6 +1,5 @@
 use crate::error::*;
 use dirs::home_dir;
-use log::*;
 use reqwest::{header, header::HeaderValue, Client};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, env, fs::File, io::prelude::*};
@@ -59,7 +58,6 @@ pub async fn create(
     // content must not be blank
     // must have at least 1 file
 
-    info!("creating gist");
     let response = make_client()?
         .post("https://api.github.com/gists")
         .json(&PostGistsRequest {
@@ -84,6 +82,7 @@ pub async fn create(
     Ok(response.id)
 }
 
+#[allow(dead_code)]
 pub async fn delete(id: &str) -> Result<()> {
     let response = make_client()?
         .delete(&format!("https://api.github.com/gists/{}", id))
