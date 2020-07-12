@@ -6,12 +6,17 @@ use git2::{
     ResetType,
 };
 use log::*;
-use std::{fs::File, io, io::BufReader, path::PathBuf};
+use std::{
+    fs::File,
+    io,
+    io::BufReader,
+    path::{Path, PathBuf},
+};
 
 pub async fn handle_heavy_paths(
     paths: Vec<PathBuf>,
     gist_id: String,
-    need_temp_file: bool,
+    delete_temp_file: bool,
 ) -> Result<()> {
     let tmp_dir = tempfile::Builder::new()
         .prefix(concat!(crate_name!(), "-"))
@@ -20,7 +25,7 @@ pub async fn handle_heavy_paths(
     let tmp_dir_path = tmp_dir.path().to_path_buf();
 
     let result = tokio::task::spawn_blocking(move || {
-        handle_heavy_paths_inner(paths, gist_id, tmp_dir_path, need_temp_file)
+        handle_heavy_paths_inner(paths, &gist_id, &tmp_dir_path, delete_temp_file)
     })
     .await?;
 
@@ -70,9 +75,9 @@ fn get_callbacks(pushing: bool) -> RemoteCallbacks<'static> {
 
 fn handle_heavy_paths_inner(
     paths: Vec<PathBuf>,
-    gist_id: String,
-    dir: PathBuf,
-    need_temp_file: bool,
+    gist_id: &str,
+    dir: &Path,
+    delete_temp_file: bool,
 ) -> Result<()> {
     // Prepare fetch options.
     let mut fo = FetchOptions::new();
@@ -97,7 +102,7 @@ fn handle_heavy_paths_inner(
             let tree = branch.get().peel_to_tree()?;
             let mut tree_builder = repo.treebuilder(Some(&tree))?;
 
-            if need_temp_file {
+            if delete_temp_file {
                 debug!("removing temp");
                 tree_builder.remove("temp")?;
             }
@@ -115,7 +120,7 @@ fn handle_heavy_paths_inner(
                 let oid = odb_writer.finalize()?;
                 let filename = path.file_name().unwrap();
 
-                tree_builder.insert(filename, oid, 0o100644)?;
+                tree_builder.insert(filename, oid, 0o100_644)?;
             }
 
             let new_tree_oid = tree_builder.write()?;

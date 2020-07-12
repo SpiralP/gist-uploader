@@ -43,7 +43,7 @@ async fn main() -> Result<()> {
         futures::stream::iter(matches.values_of("file").unwrap().map(|file| async move {
             let path = Path::new(file);
             // TODO break early if errors
-            Ok((path, get_light_content(&path).await?))
+            Ok((path, get_light_content(path).await?))
         }))
         .buffer_unordered(32)
         .collect()
@@ -70,7 +70,7 @@ async fn main() -> Result<()> {
         files.insert("temp".to_string(), "temp".to_string());
     } else {
         for (path, content) in light_contents.drain(..) {
-            // TODO check if we can do dirs?
+            // Gist does not support directories.
             let file_name = if path.to_str().unwrap() == "-" {
                 "stdin.txt".to_string()
             } else {
@@ -99,7 +99,11 @@ async fn main() -> Result<()> {
 }
 
 async fn get_light_content(path: &Path) -> Result<Option<String>> {
-    let mut reader: Pin<Box<dyn AsyncRead>> = if path.to_str().unwrap() != "-" {
+    let mut reader: Pin<Box<dyn AsyncRead>> = if path.to_str().unwrap() == "-" {
+        // windows ctrl-z, linux ctrl-d
+        info!("reading text from stdin");
+        Box::pin(BufReader::new(stdin()))
+    } else {
         let f = File::open(path).await?;
         if f.metadata().await?.len() > 10 * 1024 * 1024 {
             // Be aware that for files larger than ten megabytes, you'll need to clone the gist
@@ -107,10 +111,6 @@ async fn get_light_content(path: &Path) -> Result<Option<String>> {
         }
 
         Box::pin(BufReader::new(f))
-    } else {
-        // windows ctrl-z, linux ctrl-d
-        info!("reading text from stdin");
-        Box::pin(BufReader::new(stdin()))
     };
 
     let mut content = String::new();
